@@ -1,0 +1,46 @@
+---
+# tasks file for dns
+- name: refresh subscription manager
+  command: subscription-manager refresh
+
+- name: set resolv.conf
+  blockinfile:
+    dest: /etc/resolv.conf
+    block: |
+      DNS=10.0.0.3
+      FallbackDNS=8.8.8.8
+      Domains="max.local"
+
+    insertafter: EOF
+    create: yes
+
+- name: set network-scripts
+  blockinfile:
+    dest: /etc/sysconfig/network-scripts/ifcfg-ens224
+    block: |
+      DNS1=8.8.8.8
+      DNS2=8.8.4.4
+      DOMAIN=localdomain
+
+    insertafter: EOF
+    create: yes
+
+- name: Install bind
+  ansible.builtin.yum:
+    name: bind
+    state: latest
+
+- name: Install bind-utils
+  ansible.builtin.yum:
+    name: bind-utils
+    state: latest
+
+# - name: enable named service
+#   service:
+#     name: named
+#     state: enabled
+
+- name: start named service
+  service:
+    name: named
+    state: started
