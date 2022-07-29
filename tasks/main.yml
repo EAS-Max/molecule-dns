@@ -15,10 +15,10 @@
     create: yes
 
 # - name: debug hostvars
-#   debug: var=hostvars['sing-max-dns'].ansible_all_ipv4_addresses[1]
+#   debug: var=hostvars['max-dns'].ansible_all_ipv4_addresses[1]
 
 - name: debug hostvars
-  debug: var=hostvars['sing-max-dns']
+  debug: var=hostvars['max-dns']
 
 - name: set network-scripts
   blockinfile:
@@ -80,7 +80,7 @@
       ;Reverse lookup for Name Server
       100 IN PTR dns-primary.max.local.
       ;PTR Record IP address to HostName
-      {{ hostvars['sing-max-dns'].ansible_all_ipv4_addresses[1] }} IN PTR app3
+      {{ hostvars['max-dns'].ansible_all_ipv4_addresses[1] }} IN PTR app3
       10.0.0.1 IN PTR app1
       10.0.0.2 IN PTR app5
       10.0.0.11 IN PTR app4
@@ -106,7 +106,7 @@
       ;IP address of Name Server
       dns-primary IN  A       10.0.0.3
       ;A - Record HostName To IP Address
-      app3    IN A       {{ hostvars['sing-max-dns'].ansible_all_ipv4_addresses[1] }}
+      app3    IN A       {{ hostvars['max-dns'].ansible_all_ipv4_addresses[1] }}
       app1    IN A       10.0.0.1
       app5    IN A       10.0.0.2
       app4    IN A       10.0.0.11

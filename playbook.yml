@@ -1,4 +1,4 @@
-- hosts: sing-max-dns
+- hosts: max-dns
   tasks:
     - name: dns tasks
       include_tasks: tasks/main.yml
