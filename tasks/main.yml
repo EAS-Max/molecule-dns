@@ -1,0 +1,119 @@
+---
+# tasks file for dns
+- name: refresh subscription manager
+  command: subscription-manager refresh
+
+- name: set resolv.conf
+  blockinfile:
+    dest: /etc/resolv.conf
+    block: |
+      DNS=10.0.0.3
+      FallbackDNS=8.8.8.8
+      Domains="max.local"
+
+    insertafter: EOF
+    create: yes
+
+# - name: debug hostvars
+#   debug: var=hostvars['sing-max-dns'].ansible_all_ipv4_addresses[1]
+
+- name: debug hostvars
+  debug: var=hostvars['sing-max-dns']
+
+- name: set network-scripts
+  blockinfile:
+    dest: /etc/sysconfig/network-scripts/ifcfg-ens224
+    block: |
+      DNS1=8.8.8.8
+      DNS2=8.8.4.4
+      DOMAIN=localdomain
+
+    insertafter: EOF
+    create: yes
+
+- name: Install bind
+  ansible.builtin.yum:
+    name: bind
+    state: latest
+
+- name: Install bind-utils
+  ansible.builtin.yum:
+    name: bind-utils
+    state: latest
+
+# - name: enable named service
+#   service:
+#     name: named
+#     state: enabled
+
+- name: start named service
+  service:
+    name: named
+    state: started
+
+- name: options line
+  lineinfile:
+    dest: /etc/sysconfig/named
+    line: OPTIONS="-4"
+
+    insertafter: EOF
+    create: yes
+
+- name: restart named service
+  service:
+    name: named
+    state: restarted
+
+- name: set network-scripts
+  blockinfile:
+    dest: /var/named/192.168.0.db
+    block: |
+      @  IN  SOA    dns-primary.max.local. root.max.local. (
+      1001    ;Serial
+      3H      ;Refresh
+      15M     ;Retry
+      1W      ;Expire
+      1D      ;Minimum TTL
+      )
+      ;Name Server Information
+      @ IN  NS      dns-primary.max.local.
+      ;Reverse lookup for Name Server
+      100 IN PTR dns-primary.max.local.
+      ;PTR Record IP address to HostName
+      {{ hostvars['sing-max-dns'].ansible_all_ipv4_addresses[1] }} IN PTR app3
+      10.0.0.1 IN PTR app1
+      10.0.0.2 IN PTR app5
+      10.0.0.11 IN PTR app4
+      10.0.0.10 IN PTR app2
+      192.168.1.136 IN PTR app6
+
+    insertafter: EOF
+    create: yes
+
+- name: set network-scripts
+  blockinfile:
+    dest: /var/named/max.local.db
+    block: |
+      @   IN  SOA     dns-primary.max.local. root.max.local. (
+      3H      ;Refresh
+      1001    ;Serial
+      15M     ;Retry
+      1W      ;Expire
+      1D      ;Minimum TTL
+      )
+      ;Name Server Information
+      @      IN  NS      dns-primary.max.local.
+      ;IP address of Name Server
+      dns-primary IN  A       10.0.0.3
+      ;A - Record HostName To IP Address
+      app3    IN A       {{ hostvars['sing-max-dns'].ansible_all_ipv4_addresses[1] }}
+      app1    IN A       10.0.0.1
+      app5    IN A       10.0.0.2
+      app4    IN A       10.0.0.11
+      app2    IN A       10.0.0.10
+      app6    IN A       192.168.1.136
+      ;CNAME record
+      ftp     IN CNAME        max.local
+
+    insertafter: EOF
+    create: yes
