@@ -5,9 +5,10 @@
 
 - name: set resolv.conf
   blockinfile:
+    marker: ";from ansible"
     dest: /etc/resolv.conf
     block: |
-      DNS=10.0.0.3
+      DNS=10.0.0.5
       FallbackDNS=8.8.8.8
       Domains="max.local"
 
@@ -17,16 +18,17 @@
 # - name: debug hostvars
 #   debug: var=hostvars['max-dns'].ansible_all_ipv4_addresses[1]
 
-- name: debug hostvars
-  debug: var=hostvars['max-dns']
+# - name: debug hostvars
+#   debug: var=hostvars['max-dns']
 
 - name: set network-scripts
   blockinfile:
+    marker: "#from ansible"
     dest: /etc/sysconfig/network-scripts/ifcfg-ens224
     block: |
-      DNS1=8.8.8.8
-      DNS2=8.8.4.4
-      DOMAIN=localdomain
+      DEFROUTE=yes
+      DNS1=10.0.0.5
+      DOMAIN="max.local"
 
     insertafter: EOF
     create: yes
@@ -50,70 +52,180 @@
   service:
     name: named
     state: started
+    enabled: yes
 
-- name: options line
-  lineinfile:
-    dest: /etc/sysconfig/named
-    line: OPTIONS="-4"
+# - name: restart named service
+#   service:
+#     name: named
+#     state: restarted
+
+# - name: set network-scripts
+#   blockinfile:
+#     dest: /var/named/max.local.db
+#     block: |
+#       @  IN  SOA    dns-primary.max.local. root.max.local. (
+#       1001    ;Serial
+#       3H      ;Refresh
+#       15M     ;Retry
+#       1W      ;Expire
+#       1D      ;Minimum TTL
+#       )
+#       ;Name Server Information
+#       @ IN  NS      dns-primary.max.local.
+#       ;Reverse lookup for Name Server
+#       100 IN PTR dns-primary.max.local.
+#       ;PTR Record IP address to HostName
+#       {{ hostvars['max-dns'].ansible_all_ipv4_addresses[1] }} IN PTR app3
+#       10.0.0.1 IN PTR app1
+#       10.0.0.2 IN PTR app5
+#       10.0.0.11 IN PTR app4
+#       10.0.0.10 IN PTR app2
+#       192.168.1.136 IN PTR app6
+#       gateway IN A 10.0.0.1
+
+#     insertafter: EOF
+#     create: yes
+
+- name: set network-scripts
+  blockinfile:
+    marker: ";from ansible"
+    dest: /var/named/max.local.db
+    block: |
+      $TTL 86400
+      @ IN SOA dns-primary.max.local. admin.max.local. (
+            2019061800 ;Serial
+            3600 ;Refresh
+            1800 ;Retry
+            604800 ;Expire
+            86400 ;Minimum TTL
+      )
+      ;Name Server Information
+      @ IN NS dns-primary.max.local.
+      ;IP for Name Server
+      dns-primary IN A 10.0.0.5
+      ;A Record for IP address to Hostname 
+      dhcp IN A 10.0.0.3
+      gateway IN A 10.0.0.1
+      app4 IN A 10.0.0.4
+    insertafter: EOF
+    create: yes
+
+- name: delete file named.conf
+  ansible.builtin.file:
+    path: /etc/named.conf
+    state: absent
+
+- name: set named config
+  blockinfile:
+    marker: "//from ansible"
+    dest: /etc/named.conf
+    block: |
+      options {
+        directory     "/var/named";
+        dump-file      "/var/named/data/cache_dump.db";
+        statistics-file "/var/named/data/named_stats.txt";
+        memstatistics-file  "/var/named/data/named_mem_stats.txt";
+        secroots-file    "/var/named/data/named.secroots";
+        recursing-file "/var/named/data/named.recursing";
+        allow-query {localhost;10.0.0.0/24;};
+        
+        recursion yes;
+        dnssec-enable yes;
+        dnssec-validation yes;
+        
+        managed-keys-directory "/var/named/dynamic";
+        pid-file "/run/named/named.pid";
+        session-keyfile "/run/named/session.key";
+      };
+
+      logging {
+        channel default_debug {
+          file "data/named.run";
+          severity dynamic;
+        };
+      };
+
+      zone "max.local" IN {
+        type master;
+        file "/var/named/max.local.db";
+        allow-update { none; };
+      };
+
+      zone "0.0.10.in-addr.arpa" IN {
+        type master;
+        file "/var/named/max.local.rev";
+        allow-update { none; };
+      };
+
+      include "/etc/named.rfc1912.zones";
+      include "/etc/named.root.key";
 
     insertafter: EOF
     create: yes
 
-- name: restart named service
+- name: "writting the rev file /var/named/max.local.rev"
+  blockinfile:
+    dest: /var/named/max.local.rev
+    insertafter: EOF
+    marker: ";from ansible"
+    create: yes
+    block: |
+      $TTL 86400
+      @ IN SOA dns-primary.max.local. admin.max.local. (
+          2019061800 ;Serial
+          3600 ;Refresh
+          1800 ;Retry
+          604800 ;Expire
+          86400 ;Minimum TTL
+      )
+      ;Name Server Information
+      @ IN NS dns-primary.max.local.
+      ;Reverse lookup for Name Server
+      3 IN PTR dns-primary.max.local.
+      ;PTR Record IP address to HostName
+      2 IN PTR dhcp.max.local.
+      1 IN PTR gateway.max.local.
+
+- name: Change ownership for db
+  ansible.builtin.file:
+    path: /var/named/max.local.rev
+    group: named
+
+- name: Change ownership for db
+  ansible.builtin.file:
+    path: /var/named/max.local.db
+    group: named
+
+- name: checkconf command
+  command: named-checkconf
+
+- name: add the .rev files to the checkzone
+  command: named-checkzone 10.0.0.5 /var/named/max.local.rev
+
+- name: add domain files to the checkzone
+  command: named-checkzone max.local /var/named/max.local.db
+
+- name: restart named
   service:
     name: named
     state: restarted
 
-- name: set network-scripts
-  blockinfile:
-    dest: /var/named/192.168.0.db
-    block: |
-      @  IN  SOA    dns-primary.max.local. root.max.local. (
-      1001    ;Serial
-      3H      ;Refresh
-      15M     ;Retry
-      1W      ;Expire
-      1D      ;Minimum TTL
-      )
-      ;Name Server Information
-      @ IN  NS      dns-primary.max.local.
-      ;Reverse lookup for Name Server
-      100 IN PTR dns-primary.max.local.
-      ;PTR Record IP address to HostName
-      {{ hostvars['max-dns'].ansible_all_ipv4_addresses[1] }} IN PTR app3
-      10.0.0.1 IN PTR app1
-      10.0.0.2 IN PTR app5
-      10.0.0.11 IN PTR app4
-      10.0.0.10 IN PTR app2
-      192.168.1.136 IN PTR app6
+- name: Add dns service permanent
+  ansible.posix.firewalld:
+    service: dns
+    permanent: yes
+    state: enabled
 
-    insertafter: EOF
-    create: yes
+- name: reloading firewalld
+  service:
+    name: firewalld
+    state: restarted
 
-- name: set network-scripts
-  blockinfile:
-    dest: /var/named/max.local.db
-    block: |
-      @   IN  SOA     dns-primary.max.local. root.max.local. (
-      3H      ;Refresh
-      1001    ;Serial
-      15M     ;Retry
-      1W      ;Expire
-      1D      ;Minimum TTL
-      )
-      ;Name Server Information
-      @      IN  NS      dns-primary.max.local.
-      ;IP address of Name Server
-      dns-primary IN  A       10.0.0.3
-      ;A - Record HostName To IP Address
-      app3    IN A       {{ hostvars['max-dns'].ansible_all_ipv4_addresses[1] }}
-      app1    IN A       10.0.0.1
-      app5    IN A       10.0.0.2
-      app4    IN A       10.0.0.11
-      app2    IN A       10.0.0.10
-      app6    IN A       192.168.1.136
-      ;CNAME record
-      ftp     IN CNAME        max.local
-
-    insertafter: EOF
-    create: yes
+- name: network manager
+  service:
+    name: NetworkManager
+    state: restarted
+# - name: dns service
+#   service:
+#     name: dns
+#     state: started
