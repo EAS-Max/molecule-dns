@@ -8,18 +8,18 @@
     marker: ";from ansible"
     dest: /etc/resolv.conf
     block: |
-      DNS=10.0.0.5
+      DNS={{ dns }}
       FallbackDNS=8.8.8.8
-      Domains="max.local"
+      Domains="{{ domain }}.{{ domain_area }}"
 
     insertafter: EOF
     create: yes
 
 # - name: debug hostvars
-#   debug: var=hostvars['max-dns'].ansible_all_ipv4_addresses[1]
+#   debug: var=hostvars['{{ domain }}-dns'].ansible_all_ipv4_addresses[1]
 
 # - name: debug hostvars
-#   debug: var=hostvars['max-dns']
+#   debug: var=hostvars['{{ domain }}-dns']
 
 - name: set network-scripts
   blockinfile:
@@ -27,8 +27,8 @@
     dest: /etc/sysconfig/network-scripts/ifcfg-ens224
     block: |
       DEFROUTE=yes
-      DNS1=10.0.0.5
-      DOMAIN="max.local"
+      DNS1={{ dns }}
+      DOMAIN="{{ domain }}.{{ domain_area }}"
 
     insertafter: EOF
     create: yes
@@ -61,9 +61,9 @@
 
 # - name: set network-scripts
 #   blockinfile:
-#     dest: /var/named/max.local.db
+#     dest: /var/named/{{ domain }}.{{ domain_area }}.db
 #     block: |
-#       @  IN  SOA    dns-primary.max.local. root.max.local. (
+#       @  IN  SOA    dns-primary.{{ domain }}.{{ domain_area }}. root.{{ domain }}.{{ domain_area }}. (
 #       1001    ;Serial
 #       3H      ;Refresh
 #       15M     ;Retry
@@ -71,11 +71,11 @@
 #       1D      ;Minimum TTL
 #       )
 #       ;Name Server Information
-#       @ IN  NS      dns-primary.max.local.
+#       @ IN  NS      dns-primary.{{ domain }}.{{ domain_area }}.
 #       ;Reverse lookup for Name Server
-#       100 IN PTR dns-primary.max.local.
+#       100 IN PTR dns-primary.{{ domain }}.{{ domain_area }}.
 #       ;PTR Record IP address to HostName
-#       {{ hostvars['max-dns'].ansible_all_ipv4_addresses[1] }} IN PTR app3
+#       {{ hostvars['{{ domain }}-dns'].ansible_all_ipv4_addresses[1] }} IN PTR app3
 #       10.0.0.1 IN PTR app1
 #       10.0.0.2 IN PTR app5
 #       10.0.0.11 IN PTR app4
@@ -89,10 +89,10 @@
 - name: set network-scripts
   blockinfile:
     marker: ";from ansible"
-    dest: /var/named/max.local.db
+    dest: /var/named/{{ domain }}.{{ domain_area }}.db
     block: |
       $TTL 86400
-      @ IN SOA dns-primary.max.local. admin.max.local. (
+      @ IN SOA dns-primary.{{ domain }}.{{ domain_area }}. admin.{{ domain }}.{{ domain_area }}. (
             2019061800 ;Serial
             3600 ;Refresh
             1800 ;Retry
@@ -100,13 +100,12 @@
             86400 ;Minimum TTL
       )
       ;Name Server Information
-      @ IN NS dns-primary.max.local.
+      @ IN NS dns-primary.{{ domain }}.{{ domain_area }}.
       ;IP for Name Server
-      dns-primary IN A 10.0.0.5
+      dns-primary IN A {{ dns }}
       ;A Record for IP address to Hostname 
-      dhcp IN A 10.0.0.3
-      gateway IN A 10.0.0.1
-      app4 IN A 10.0.0.4
+      dhcp IN A {{ dhcp_ip }}
+      gateway IN A {{ gateway_ip }}
     insertafter: EOF
     create: yes
 
@@ -145,15 +144,15 @@
         };
       };
 
-      zone "max.local" IN {
+      zone "{{ domain }}.{{ domain_area }}" IN {
         type master;
-        file "/var/named/max.local.db";
+        file "/var/named/{{ domain }}.{{ domain_area }}.db";
         allow-update { none; };
       };
 
       zone "0.0.10.in-addr.arpa" IN {
         type master;
-        file "/var/named/max.local.rev";
+        file "/var/named/{{ domain }}.{{ domain_area }}.rev";
         allow-update { none; };
       };
 
@@ -163,15 +162,15 @@
     insertafter: EOF
     create: yes
 
-- name: "writting the rev file /var/named/max.local.rev"
+- name: "writting the rev file /var/named/{{ domain }}.{{ domain_area }}.rev"
   blockinfile:
-    dest: /var/named/max.local.rev
+    dest: /var/named/{{ domain }}.{{ domain_area }}.rev
     insertafter: EOF
     marker: ";from ansible"
     create: yes
     block: |
       $TTL 86400
-      @ IN SOA dns-primary.max.local. admin.max.local. (
+      @ IN SOA dns-primary.{{ domain }}.{{ domain_area }}. admin.{{ domain }}.{{ domain_area }}. (
           2019061800 ;Serial
           3600 ;Refresh
           1800 ;Retry
@@ -179,31 +178,31 @@
           86400 ;Minimum TTL
       )
       ;Name Server Information
-      @ IN NS dns-primary.max.local.
+      @ IN NS dns-primary.{{ domain }}.{{ domain_area }}.
       ;Reverse lookup for Name Server
-      2 IN PTR dns-primary.max.local.
+      2 IN PTR dns-primary.{{ domain }}.{{ domain_area }}.
       ;PTR Record IP address to HostName
-      3 IN PTR dhcp.max.local.
-      1 IN PTR gateway.max.local.
+      3 IN PTR dhcp.{{ domain }}.{{ domain_area }}.
+      1 IN PTR gateway.{{ domain }}.{{ domain_area }}.
 
 - name: Change ownership for db
   ansible.builtin.file:
-    path: /var/named/max.local.rev
+    path: /var/named/{{ domain }}.{{ domain_area }}.rev
     group: named
 
 - name: Change ownership for db
   ansible.builtin.file:
-    path: /var/named/max.local.db
+    path: /var/named/{{ domain }}.{{ domain_area }}.db
     group: named
 
 - name: checkconf command
   command: named-checkconf
 
 - name: add the .rev files to the checkzone
-  command: named-checkzone 10.0.0.5 /var/named/max.local.rev
+  command: named-checkzone {{ dns }} /var/named/{{ domain }}.{{ domain_area }}.rev
 
 - name: add domain files to the checkzone
-  command: named-checkzone max.local /var/named/max.local.db
+  command: named-checkzone {{ domain }}.{{ domain_area }} /var/named/{{ domain }}.{{ domain_area }}.db
 
 - name: restart named
   service:

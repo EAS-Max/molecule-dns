@@ -1,2 +1,7 @@
 ---
 # defaults file for dns
+dns: 10.0.0.5
+interface_in: ens224
+interface_out: ens192
+domain: max
+domain_area: local
