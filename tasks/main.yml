@@ -1,5 +1,14 @@
 ---
 # tasks file for dns
+- name: debug hostvars
+  debug: var=hostvars['max-dhcp'].ansible_all_ipv4_addresses[1]
+
+- name: debug hostvars
+  debug: var=gateway_ip
+
+- name: debug hostvars
+  debug: var=dhcp_ip
+
 - name: refresh subscription manager
   command: subscription-manager refresh
 
