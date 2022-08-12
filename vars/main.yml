@@ -7,5 +7,5 @@ interface_out: ens192
 mac_address_gate: "{{ hostvars['max-gateway'].ansible_ens224.macaddress }}"
 mac_address_dns: "{{ hostvars['max-dns'].ansible_ens224.macaddress }}"
 domain_area: local
-dhcp_ip: hostvars['max-dhcp'].ansible_all_ipv4_addresses[1]
-gateway_ip: hostvars['max-gateway'].ansible_all_ipv4_addresses[1]
+dhcp_ip: "{{ hostvars['max-dhcp'].ansible_all_ipv4_addresses[1] }}"
+gateway_ip: "{{ hostvars['max-gateway'].ansible_all_ipv4_addresses[1] }}"
