@@ -115,6 +115,7 @@
       ;A Record for IP address to Hostname 
       dhcp IN A {{ dhcp_ip }}
       gateway IN A {{ gateway_ip }}
+      node IN A {{ node_ip }}
     insertafter: EOF
     create: yes
 
