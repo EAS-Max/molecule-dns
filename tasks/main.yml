@@ -193,6 +193,7 @@
       ;PTR Record IP address to HostName
       3 IN PTR dhcp.{{ domain }}.{{ domain_area }}.
       1 IN PTR gateway.{{ domain }}.{{ domain_area }}.
+      4 IN PTR node.{{ domain }}.{{ domain_area }}.
 
 - name: Change ownership for db
   ansible.builtin.file:

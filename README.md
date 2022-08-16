@@ -1,7 +1,7 @@
 Role Name
 =========
 
-A brief description of the role goes here.
+This role configures DNS server for a rhel machine using bind. This role is designed to run in a cluster with other network roles however it will also run by itself when provided with the necessary variables in the vars/main.yml file.
 
 Requirements
 ------------
